@@ -1,4 +1,4 @@
-# xiao_nrf52840-ArduCam-Transmitter
+# xiao_nrf52840-Environment-Transmitter
 October 6, 2024 - WORK IN PROGRESS
 Arduino sketch for the Seeed Xiao nRF52840 board and the ArduCam Mini-2MP-Plus Camera that can be triggered by and transfer image data over BLE. 
 
