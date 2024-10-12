@@ -5,26 +5,34 @@
 #include "Adafruit_TinyUSB.h"
 #include <bluefruit.h>
 #include <math.h>
+#include <Adafruit_Sensor.h>
+#include "Adafruit_BMP3XX.h"
 const int CS = D1;
 bool is_header = false;
 int loopCount = 0;
 ArduCAM myCAM( OV2640, CS );
 
-// Setup Custom Camera Service and Characteristic.
+Adafruit_BMP3XX bmp;
+// Custom Camera Service and Characteristic.
 BLEService        cameraService = BLEService("e334b051-66f2-487f-8d55-9d2dda3a17cd");
 BLECharacteristic cameraCharacteristic = BLECharacteristic("9a82b386-3169-475a-935a-2394cd7a4d1d");
-
+// Custom Air Monitor Service and Characteristics.
+BLEService        airMonitorService = BLEService("48ee2739-61c5-4594-b912-45a1646bef09");
+BLECharacteristic temperatureCharacteristic = BLECharacteristic("54eae144-c9b0-448e-9546-facb32a8bc75");
+BLECharacteristic pressureCharacteristic = BLECharacteristic("6d5c74ff-9853-4350-8970-456607fddcf8");
 BLEDis bledis;    // DIS (Device Information Service) helper class instance
 BLEBas batteryService;    // Battery service
 
 // Store image data here.
 char CameraData[150000];
 int imageLength = 0;
-/// GENERAL WORKFLOW:
+/// GENERAL Camera WORKFLOW:
 /// 1. BLE Client writes value 0xFF,0xFF,0xFF,0xFF,0xFF,0x74,0x00,0x00 value to Camera Characteristic to trigger camera.
 /// 2. Board writes total count of image packets ceil(Image Length / 512) to Camera Characteristic in format 0xFF,0xEF,0xDF,0xCF,0xBF,<Count: 0 to 255>,0x00,0x00.
 /// 3. BLE Client writes a integer between 0 and ceiling(Image Length / 512) to get a packet of image data.
 /// 4. Board maintains no state. If the trigger command is received during image transfer, the existing image is overwritten.
+
+/// Other data is periodically sampled and written to the relevant characteristic.
 void setup() {
   // put your setup code here, to run once:
   
@@ -89,9 +97,19 @@ void setup() {
   delay(1000);
   myCAM.clear_fifo_flag();
   Serial.println("ArduCAM setup complete.");
+
+  Serial.println("Now setting up Air Pressure/Temperature monitor.");
+  while (!bmp.begin_I2C()) { 
+    Serial.println("Could not find BMP.");
+  }
+  bmp.setTemperatureOversampling(BMP3_OVERSAMPLING_8X);
+  bmp.setPressureOversampling(BMP3_OVERSAMPLING_4X);
+  bmp.setIIRFilterCoeff(BMP3_IIR_FILTER_COEFF_3);
+  bmp.setOutputDataRate(BMP3_ODR_50_HZ);
+  Serial.println("Air Pressure/Temperature monitor setup complete.");
   Serial.println("Now setting up BLE and its services.");
 
-  
+  Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
   Bluefruit.begin();
   Bluefruit.setName("ArduCAM");
   // Set the connect/disconnect callback handlers
@@ -111,12 +129,23 @@ void setup() {
   
   Serial.println("Now configuring the custom Camera Service and Characteristic.");
   cameraService.begin();
-  cameraCharacteristic.setProperties(CHR_PROPS_WRITE | CHR_PROPS_READ);
+  cameraCharacteristic.setProperties(CHR_PROPS_WRITE | CHR_PROPS_READ |CHR_PROPS_NOTIFY);
   cameraCharacteristic.setPermission(SECMODE_OPEN, SECMODE_OPEN);
   cameraCharacteristic.notifyEnabled(true);
-  //cameraCharacteristic.setFixedLen(1);
+  cameraCharacteristic.setFixedLen(244);
   cameraCharacteristic.begin();
   Serial.println("Camera Service and Characteristic setup is complete.");
+
+  Serial.println("Now configuring the custom Air Monitor Service and Characteristics");
+  airMonitorService.begin();
+  temperatureCharacteristic.setProperties(CHR_PROPS_READ);
+  temperatureCharacteristic.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+  temperatureCharacteristic.begin();
+  pressureCharacteristic.setProperties(CHR_PROPS_READ);
+  pressureCharacteristic.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+  pressureCharacteristic.begin();
+  Serial.println("Air Monitor Service and Characteristic setup is complete.");
+
   // Setup the advertising packet(s)
   Serial.println("Now setting up BLE Advertising.");
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
@@ -137,8 +166,16 @@ void setup() {
 void connect_callback(uint16_t conn_handle)
 {
   BLEConnection* connection = Bluefruit.Connection(conn_handle);
+  // Increase the bandwidth.
+  connection->requestPHY();
+  connection->requestDataLengthUpdate();
+  connection->requestMtuExchange(247); 
+  Serial.println("All requests send. Now waiting 30 secs.");
+  delay(3000);
+  
   char central_name[32] = { 0 };
   connection->getPeerName(central_name, sizeof(central_name));
+  
   Serial.print("Connected to ");
   Serial.println(central_name);
 }
@@ -153,9 +190,9 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
   Serial.println("Resuming Advertising.");
 }
 void loop() {
-  // Read bat level only every ~30 seconds.
-  if(loopCount % 30 == 0){
-    Serial.println("Time to read battery.");
+  // Read Air Monitor Vals, Battery Level every 3000 loops.
+  if(loopCount % 3000 == 0){
+    Serial.println("Time to read battery and air monitor.");
     int vbatt = analogRead(PIN_VBAT);
     float adcVoltage = 2.961 * 3.6 * vbatt / 4096;
     //very rough assumptions: assume full bat = 3.6V,  dead battery = 2 V.
@@ -163,12 +200,23 @@ void loop() {
     Serial.print("Battery level: ");Serial.println(batteryLevel);
     batteryService.write(batteryLevel);
 
+    // Perform Air Monitor Readings.
+    if(!bmp.performReading()){
+      Serial.println("Failed to perform temperature and air pressure reading.");
+    }
+    int temperature = ceil(bmp.temperature);
+    int airPressure = ceil(bmp.pressure / 100);
+    Serial.print("Temp: ");
+    Serial.println(bmp.temperature);
+    Serial.print("Pressure: ");
+    Serial.println(bmp.pressure);
+    char tempReading[2] = {temperature >> 8, temperature & 0xFF};
+    char pressureReading[2] = {airPressure >> 8, airPressure & 0xFF};
+    temperatureCharacteristic.write(tempReading, 2);
+    pressureCharacteristic.write(pressureReading, 2);
   }
-  delay(1000);
-  String myInput = Serial.readString();
-  myInput.trim();
   if ( Bluefruit.connected() ) {
-      char buffer[512];
+      char buffer[20];
       // Are values == trigger sequence? (0xFF,0xFF,0xFF,0xFF,0xFF,0x74,0x00,0x00)
       if (cameraCharacteristic.read(&buffer, 8) && 
           buffer[0] == 0xFF && 
@@ -200,32 +248,37 @@ void loop() {
         Serial.println("Image length: ");
         Serial.println(imageLength);
         Serial.println("Packet Count: ");
-        Serial.println(ceil((float)imageLength/512));
-        cameraCharacteristic.write8(ceil((float)imageLength/512));
-  // Are values == packet count? (0xFF,0xEF,0xDF,0xCF,0xBF,<Count>,0x00,0x00)
-  }else if(cameraCharacteristic.read(&buffer, 8) && 
+        short totalPacketCount = ceil((float)imageLength/244);
+        Serial.println(totalPacketCount);
+        char packetCount[2] = { totalPacketCount >> 8, totalPacketCount & 0xFF};
+        Serial.print("Upper byte:");Serial.println(packetCount[0], HEX);
+        Serial.print("Low byte:");Serial.println(packetCount[1], HEX);
+        cameraCharacteristic.write(packetCount, 2);
+  // Are values == packet count? (0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00)
+  }else if(cameraCharacteristic.read(&buffer, 9) && 
           buffer[0] == 0xFF && 
           buffer[1] == 0xEF &&
           buffer[2] == 0xDF &&
           buffer[3] == 0xCF &&
           buffer[4] == 0xBF &&
-          buffer[6] == 0x00 &&
-          buffer[7] == 0x00){
+          buffer[7] == 0x00 &&
+          buffer[8] == 0x00){
+        int requestedPacketNum = (buffer[5] << 8) | buffer[6];
         Serial.print("Write packet #");
-        Serial.println(buffer[5], DEC);
-        char writeBuffer[512];
+        Serial.println(requestedPacketNum, DEC);
+        char writeBuffer[244];
         int  y = 0;
-        for(int i = buffer[5] * 512; i < (buffer[5] * 512) + 512; i++){
+        for(int i = requestedPacketNum * 244; i < (requestedPacketNum * 244) + 244; i++){
           Serial.print("0x");Serial.print(CameraData[i], HEX);Serial.println(",");
           writeBuffer[y] = CameraData[i];
           y++;
         }
-        cameraCharacteristic.write(writeBuffer, 512);
+        cameraCharacteristic.write(writeBuffer, 244);
   
   }
   }
-  Serial.print("Loop Count: ");Serial.println(loopCount);
-  delay(1000);
+  //Serial.print("Loop Count: ");Serial.println(loopCount);
+  
   loopCount++;
 
 }
