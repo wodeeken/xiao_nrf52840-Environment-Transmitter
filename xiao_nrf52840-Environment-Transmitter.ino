@@ -7,10 +7,17 @@
 #include <math.h>
 #include <Adafruit_Sensor.h>
 #include "Adafruit_BMP3XX.h"
+#include <DHT.h>
+// Chip select for ArduCAM.
 const int CS = D1;
+// Analog pin for humidity (DHT11)
+const int DHT_AnalogPin = A0;
 bool is_header = false;
 int loopCount = 0;
+// Camera
 ArduCAM myCAM( OV2640, CS );
+// Humidity Sensor.
+DHT myDHT(DHT_AnalogPin, DHT11);
 
 Adafruit_BMP3XX bmp;
 // Custom Camera Service and Characteristic.
@@ -20,6 +27,7 @@ BLECharacteristic cameraCharacteristic = BLECharacteristic("9a82b386-3169-475a-9
 BLEService        airMonitorService = BLEService("48ee2739-61c5-4594-b912-45a1646bef09");
 BLECharacteristic temperatureCharacteristic = BLECharacteristic("54eae144-c9b0-448e-9546-facb32a8bc75");
 BLECharacteristic pressureCharacteristic = BLECharacteristic("6d5c74ff-9853-4350-8970-456607fddcf8");
+BLECharacteristic humidityCharacteristic = BLECharacteristic("b2ecd36f-6730-45a8-a5fe-351191642c24");
 BLEDis bledis;    // DIS (Device Information Service) helper class instance
 BLEBas batteryService;    // Battery service
 
@@ -144,6 +152,9 @@ void setup() {
   pressureCharacteristic.setProperties(CHR_PROPS_READ);
   pressureCharacteristic.setPermission(SECMODE_OPEN, SECMODE_OPEN);
   pressureCharacteristic.begin();
+  humidityCharacteristic.setProperties(CHR_PROPS_READ);
+  humidityCharacteristic.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+  humidityCharacteristic.begin();
   Serial.println("Air Monitor Service and Characteristic setup is complete.");
 
   // Setup the advertising packet(s)
@@ -214,6 +225,17 @@ void loop() {
     char pressureReading[2] = {airPressure >> 8, airPressure & 0xFF};
     temperatureCharacteristic.write(tempReading, 2);
     pressureCharacteristic.write(pressureReading, 2);
+
+    // Read humidity reading.
+    float humidity_true = myDHT.readHumidity();
+
+    int humidity = ceil(humidity_true);
+    char humidityReading[2] = {humidity >> 8, humidity & 0xFF};
+    Serial.print("Humidity: ");
+    Serial.println(humidity);
+    humidityCharacteristic.write(humidityReading, 2);
+   // Serial.print(myDHT.humidity);
+
   }
   if ( Bluefruit.connected() ) {
       char buffer[20];
