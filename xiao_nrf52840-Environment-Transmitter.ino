@@ -28,6 +28,7 @@ BLEService        airMonitorService = BLEService("48ee2739-61c5-4594-b912-45a164
 BLECharacteristic temperatureCharacteristic = BLECharacteristic("54eae144-c9b0-448e-9546-facb32a8bc75");
 BLECharacteristic pressureCharacteristic = BLECharacteristic("6d5c74ff-9853-4350-8970-456607fddcf8");
 BLECharacteristic humidityCharacteristic = BLECharacteristic("b2ecd36f-6730-45a8-a5fe-351191642c24");
+BLECharacteristic humidity_TempCharacteristic = BLECharacteristic("eec2eb81-ebb1-4352-8420-047304011fdb");
 BLEDis bledis;    // DIS (Device Information Service) helper class instance
 BLEBas batteryService;    // Battery service
 
@@ -115,6 +116,9 @@ void setup() {
   bmp.setIIRFilterCoeff(BMP3_IIR_FILTER_COEFF_3);
   bmp.setOutputDataRate(BMP3_ODR_50_HZ);
   Serial.println("Air Pressure/Temperature monitor setup complete.");
+  Serial.println("Now setting up Humidity monitor.");
+  myDHT.begin();
+  Serial.println("Humidity monitor setup complete.");
   Serial.println("Now setting up BLE and its services.");
 
   Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
@@ -155,6 +159,9 @@ void setup() {
   humidityCharacteristic.setProperties(CHR_PROPS_READ);
   humidityCharacteristic.setPermission(SECMODE_OPEN, SECMODE_OPEN);
   humidityCharacteristic.begin();
+  humidity_TempCharacteristic.setProperties(CHR_PROPS_READ);
+  humidity_TempCharacteristic.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+  humidity_TempCharacteristic.begin();
   Serial.println("Air Monitor Service and Characteristic setup is complete.");
 
   // Setup the advertising packet(s)
@@ -228,12 +235,17 @@ void loop() {
 
     // Read humidity reading.
     float humidity_true = myDHT.readHumidity();
-
+    float humidity_temp_true = myDHT.readTemperature();
     int humidity = ceil(humidity_true);
+    int humidity_temp = ceil(humidity_temp_true);
     char humidityReading[2] = {humidity >> 8, humidity & 0xFF};
+    char tempHumidityReading[2] = {humidity_temp >> 8, humidity_temp & 0xFF};
     Serial.print("Humidity: ");
     Serial.println(humidity);
+    Serial.print("Temp used for Humidity calc: ");
+    Serial.println(humidity_temp);
     humidityCharacteristic.write(humidityReading, 2);
+    humidity_TempCharacteristic.write(tempHumidityReading, 2);
    // Serial.print(myDHT.humidity);
 
   }
