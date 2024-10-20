@@ -1,6 +1,6 @@
 # xiao_nrf52840-Environment-Transmitter
-October 13, 2024 - WORK IN PROGRESS
-Arduino sketch for the Seeed Xiao nRF52840 board, a Adafruit BMP-390 Temp/Pressure sensor, a DHT11 Humidity/Temperature sensor, and a ArduCam Mini-2MP-Plus Camera that can be triggered by and transfer data over BLE. 
+October 19, 2024 - WORK IN PROGRESS
+Arduino sketch for the Seeed Xiao nRF52840 board, a Adafruit BMP-390 Temp/Pressure sensor, a DHT11 Humidity/Temperature sensor, a MAX9814 microphone, and a ArduCam Mini-2MP-Plus Camera that can be triggered by and transfer data over BLE. 
 
 # Arduino IDE Notes
 1. In Arduino IDE, use the following board manager: https://files.seeedstudio.com/arduino/package_seeeduino_boards_index.json.
@@ -42,6 +42,15 @@ Arduino sketch for the Seeed Xiao nRF52840 board, a Adafruit BMP-390 Temp/Pressu
 | GND     | GND                            |
 | VCC     | 3v3                            |
 | DATA    | 0                              |
+
+5. The MAX9814 Microphone is wired to the XIAO nRF52840 according to the following table:
+
+| MAX9814   | XIAO nRF52840 (Printed Labels)        |
+|-----------|---------------------------------------|
+| GND       | GND                                   |
+| VDD       | 3v3                                   |
+| OUT       | 3                                     |
+| GAIN      | 3v3 (Optional, sounds good @ 40dB)    |
 
 
 
