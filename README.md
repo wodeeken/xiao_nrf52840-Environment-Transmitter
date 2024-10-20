@@ -74,22 +74,36 @@ Arduino sketch for the Seeed Xiao nRF52840 board, a Adafruit BMP-390 Temp/Pressu
 3. The Camera Trigger/Data characteristic is used to both trigger the camera and to transfer image data in JPG format.
 
 4. The Camera Trigger/Data characteristic should be used by the BLE Client/Host App in the following manner:
+   
     a. BLE Client (Host App) writes the following values to the characteristic to trigger the camera: 0xFF,0xFF,0xFF,0xFF,0xFF,0x74,0x00,0x00.
+   
     b. BLE Server (Xiao) will take the image, and then will write to characteristic two bytes in big-endian order representing the number of packets required to transfer the entire image (ceiling of Image Size / 244).
+   
     c. BLE Client waits until a non-zero value in read in from characteristic, and then writes the values 0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00, where <CountHighByte> and <CountLowByte> are the high and low bytes of the requested packet index between 0 and the value read from characteristic in the previous step.
-    d. BLE Server writes to characteristic 244 bytes of the image data (possibly less if last packet) located between indices (requested packet * 244) and (requested packet * 244 + 243). 
+   
+    d. BLE Server writes to characteristic 244 bytes of the image data (possibly less if last packet) located between indices (requested packet * 244) and (requested packet * 244 + 243).
+   
     e. BLE Client waits until image data is populated, saves data in the proper order, and then requests next packet if not already at the last packet.
+   
     f. NOTE: the XIAO board will not prevent the client from triggering the camera or microphone before all packets have been requested. In this case, all previous image and audio data is overwritten and lost.
 
-5. The Audio Trigger/Data characteristic is used to both trigger the microphone and to transfer ~12 seconds of raw audio data. The Audio Sample Rate characteristic contains the actual sample rate of the recording, which can be used by the server to playback the audio. 
+6. The Audio Trigger/Data characteristic is used to both trigger the microphone and to transfer ~12 seconds of raw audio data. The Audio Sample Rate characteristic contains the actual sample rate of the recording, which can be used by the server to playback the audio. 
 
-6. The Audio Trigger/Data characteristic should be used by the BLE Client/Host App in the following manner:
+7. The Audio Trigger/Data characteristic should be used by the BLE Client/Host App in the following manner:
+   
     a. BLE Client (Host App) writes the following values to the characteristic to trigger the camera: 0xFF,0xFF,0xFF,0xFF,0xFF,0x75,0x00,0x00.
+   
     b. BLE Server (Xiao) will begin to record audio, and after the recording is finished (roughly ~12 seconds) will write to characteristic two bytes in big-endian order representing the number of packets required to transfer the entire raw audio file (ceiling of Audio Size / 244). The audio file size is currently fixed at 200Kb, so the number of packets will always be 820.
+   
     c. BLE Client waits until a non-zero value in read in from characteristic, and then writes the values 0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00, where <CountHighByte> and <CountLowByte> are the high and low bytes of the requested packet index between 0 and the value read from characteristic in the previous step.
-    d. BLE Server writes to characteristic 244 bytes of the audio data (possibly less if last packet) located between indices (requested packet * 244) and (requested packet * 244 + 243). 
+   
+    d. BLE Server writes to characteristic 244 bytes of the audio data (possibly less if last packet) located between indices (requested packet * 244) and (requested packet * 244 + 243).
+   
     e. BLE Client waits until audio data is populated, saves data in the proper order, and then requests next packet if not already at the last packet.
+   
     f. BLE Server write the audio sample rate to the Audio Sample Rate characteristic after the recording is finished, measured in Hz.
+   
     g. NOTE: the XIAO board will not prevent the client from triggering the microphone or camera before all packets have been requested. In this case, all previous image and audio data is overwritten and lost.
+   
 
 
