@@ -55,6 +55,7 @@ Arduino sketch for the Seeed Xiao nRF52840 board, a Adafruit BMP-390 Temp/Pressu
 
 # Usage
 1. The following custom BLE services and characteristics are made available by this sketch:
+
 | Service Description | Service UUID                         | Characteristic Description      | Characteristic UUID                  | Permissions | Max Data Length (bytes) |
 |---------------------|--------------------------------------|---------------------------------|--------------------------------------|-------------|-------------------------|
 | Camera              | e334b051-66f2-487f-8d55-9d2dda3a17cd |                                 |                                      |             |                         |
