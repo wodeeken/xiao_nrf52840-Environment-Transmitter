@@ -79,7 +79,7 @@ Arduino sketch for the Seeed Xiao nRF52840 board, a Adafruit BMP-390 Temp/Pressu
    
     b. BLE Server (Xiao) will take the image, and then will write to characteristic two bytes in big-endian order representing the number of packets required to transfer the entire image (ceiling of Image Size / 244).
    
-    c. BLE Client waits until a non-zero value in read in from characteristic, and then writes the values 0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00, where <CountHighByte> and <CountLowByte> are the high and low bytes of the requested packet index between 0 and the value read from characteristic in the previous step.
+    c. BLE Client waits until a non-zero value in read in from characteristic, and then writes the values 0xFF,0xEF,0xDF,0xCF,0xBF,&lt;CountHighByte&gt;,&lt;CountLowByte&gt;,0x00,0x00, where &lt;CountHighByte&gt; and &lt;CountLowByte&gt; are the high and low bytes of the requested packet index between 0 and the value read from characteristic in the previous step.
    
     d. BLE Server writes to characteristic 244 bytes of the image data (possibly less if last packet) located between indices (requested packet * 244) and (requested packet * 244 + 243).
    
@@ -95,7 +95,7 @@ Arduino sketch for the Seeed Xiao nRF52840 board, a Adafruit BMP-390 Temp/Pressu
    
     b. BLE Server (Xiao) will begin to record audio, and after the recording is finished (roughly ~12 seconds) will write to characteristic two bytes in big-endian order representing the number of packets required to transfer the entire raw audio file (ceiling of Audio Size / 244). The audio file size is currently fixed at 200Kb, so the number of packets will always be 820.
    
-    c. BLE Client waits until a non-zero value in read in from characteristic, and then writes the values 0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00, where <CountHighByte> and <CountLowByte> are the high and low bytes of the requested packet index between 0 and the value read from characteristic in the previous step.
+    c. BLE Client waits until a non-zero value in read in from characteristic, and then writes the values 0xFF,0xEF,0xDF,0xCF,0xBF,&lt;CountHighByte&gt;,&lt;CountLowByte&gt;,0x00,0x00, where &lt;CountHighByte&gt; and &lt;CountLowByte&gt; are the high and low bytes of the requested packet index between 0 and the value read from characteristic in the previous step.
    
     d. BLE Server writes to characteristic 244 bytes of the audio data (possibly less if last packet) located between indices (requested packet * 244) and (requested packet * 244 + 243).
    
