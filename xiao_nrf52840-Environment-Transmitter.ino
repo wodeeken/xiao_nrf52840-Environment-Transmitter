@@ -40,7 +40,11 @@ BLEDis bledis;    // DIS (Device Information Service) helper class instance
 
 // Store image and audio data here.
 char Data[200000];
+bool dataTransferProcess = false;
+int lastDataPacketCount = 0;
 int imageLength = 0;
+// Max number of loop counts from beginning of camera/audio data where there are no loop waits.
+const int maxDataTransferWaitCount = 500000;
 /// GENERAL Camera/audio WORKFLOW:
 /// 1. BLE Client writes value 0xFF,0xFF,0xFF,0xFF,0xFF,0x74/0x75,0x00,0x00 value to Camera / Audio Characteristic to trigger camera/microphone.
 /// 2. Board writes total count of image packets ceil(Image Length / 512) to Camera Characteristic in format 0xFF,0xEF,0xDF,0xCF,0xBF,<Count: 0 to 255>,0x00,0x00.
@@ -229,37 +233,15 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
 }
 void loop() {
   // Read Air Monitor Vals every 300000 loops.
-  if(loopCount % 300000 == 0){
-    Serial.println("Time to read air monitor.");
-    // Perform Air Monitor Readings.
-    if(!bmp.performReading()){
-      Serial.println("Failed to perform temperature and air pressure reading.");
+  if(!dataTransferProcess){
+    // Wait 2 minutes to save energy.
+    delay(120000);
+    ReadEnvironmentSensors();
+  }else{
+    if(loopCount > maxDataTransferWaitCount){
+      // Stop the data transfer process.
+      dataTransferProcess = false;
     }
-    int temperature = ceil(bmp.temperature);
-    int airPressure = ceil(bmp.pressure / 100);
-    Serial.print("Temp: ");
-    Serial.println(bmp.temperature);
-    Serial.print("Pressure: ");
-    Serial.println(bmp.pressure);
-    char tempReading[2] = {temperature >> 8, temperature & 0xFF};
-    char pressureReading[2] = {airPressure >> 8, airPressure & 0xFF};
-    temperatureCharacteristic.write(tempReading, 2);
-    pressureCharacteristic.write(pressureReading, 2);
-
-    // Read humidity reading.
-    float humidity_true = DHTSensor.readHumidity();
-    float humidity_temp_true = DHTSensor.readTemperature();
-    int humidity = ceil(humidity_true);
-    int humidity_temp = ceil(humidity_temp_true);
-    char humidityReading[2] = {humidity >> 8, humidity & 0xFF};
-    char tempHumidityReading[2] = {humidity_temp >> 8, humidity_temp & 0xFF};
-    Serial.print("Humidity: ");
-    Serial.println(humidity);
-    Serial.print("Temp used for Humidity calc: ");
-    Serial.println(humidity_temp);
-    humidityCharacteristic.write(humidityReading, 2);
-    humidity_TempCharacteristic.write(tempHumidityReading, 2);
-
   }
   if ( Bluefruit.connected() ) {
       char buffer[20];
@@ -276,6 +258,9 @@ void loop() {
       // Clear out whole cameradata array.
       for(int i = 0; i < 200000; i++)
         Data[i] = 0;
+      
+      dataTransferProcess = true;
+      loopCount = 0;
       Serial.println("Triggering camera.");
       // Zero out characteristic.
       cameraCharacteristic.write8(0);
@@ -313,7 +298,9 @@ void loop() {
           buffer[5] == 0x75 && 
           buffer[6] == 0x00 &&
           buffer[7] == 0x00 ){
-            audioCharacteristic.write8(0);
+        
+        audioCharacteristic.write8(0);
+        dataTransferProcess = true;
         RecordAudio();
   // Are values == camera packet count? (0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00)
   }else if(cameraCharacteristic.read(&buffer, 9) && 
@@ -445,3 +432,35 @@ uint8_t read_fifo_burst(ArduCAM myCAM)
   imageLength = index;
   return 1;
 }
+void ReadEnvironmentSensors(){
+    Serial.println("Time to read air monitor.");
+    // Perform Air Monitor Readings.
+    if(!bmp.performReading()){
+      Serial.println("Failed to perform temperature and air pressure reading.");
+    }
+    int temperature = ceil(bmp.temperature);
+    int airPressure = ceil(bmp.pressure / 100);
+    Serial.print("Temp: ");
+    Serial.println(bmp.temperature);
+    Serial.print("Pressure: ");
+    Serial.println(bmp.pressure);
+    char tempReading[2] = {temperature >> 8, temperature & 0xFF};
+    char pressureReading[2] = {airPressure >> 8, airPressure & 0xFF};
+    temperatureCharacteristic.write(tempReading, 2);
+    pressureCharacteristic.write(pressureReading, 2);
+
+    // Read humidity reading.
+    float humidity_true = DHTSensor.readHumidity();
+    float humidity_temp_true = DHTSensor.readTemperature();
+    int humidity = ceil(humidity_true);
+    int humidity_temp = ceil(humidity_temp_true);
+    char humidityReading[2] = {humidity >> 8, humidity & 0xFF};
+    char tempHumidityReading[2] = {humidity_temp >> 8, humidity_temp & 0xFF};
+    Serial.print("Humidity: ");
+    Serial.println(humidity);
+    Serial.print("Temp used for Humidity calc: ");
+    Serial.println(humidity_temp);
+    humidityCharacteristic.write(humidityReading, 2);
+    humidity_TempCharacteristic.write(tempHumidityReading, 2);
+
+  }
