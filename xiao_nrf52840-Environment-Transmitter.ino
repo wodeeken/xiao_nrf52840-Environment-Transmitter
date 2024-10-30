@@ -41,7 +41,6 @@ BLEDis bledis;    // DIS (Device Information Service) helper class instance
 // Store image and audio data here.
 char Data[200000];
 bool dataTransferProcess = false;
-int lastDataPacketCount = 0;
 int imageLength = 0;
 // Max number of loop counts from beginning of camera/audio data where there are no loop waits.
 const int maxDataTransferWaitCount = 500000;
@@ -301,6 +300,7 @@ void loop() {
         
         audioCharacteristic.write8(0);
         dataTransferProcess = true;
+        loopCount = 0;
         RecordAudio();
   // Are values == camera packet count? (0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00)
   }else if(cameraCharacteristic.read(&buffer, 9) && 
