@@ -261,8 +261,6 @@ void loop() {
       dataTransferProcess = true;
       loopCount = 0;
       Serial.println("Triggering camera.");
-      // Zero out characteristic.
-      cameraCharacteristic.write8(0);
        // Trigger camera
         myCAM.flush_fifo();
         myCAM.clear_fifo_flag();
@@ -298,7 +296,6 @@ void loop() {
           buffer[6] == 0x00 &&
           buffer[7] == 0x00 ){
         
-        audioCharacteristic.write8(0);
         dataTransferProcess = true;
         loopCount = 0;
         RecordAudio();
