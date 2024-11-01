@@ -43,7 +43,7 @@ char Data[200000];
 bool dataTransferProcess = false;
 int imageLength = 0;
 // Max number of loop counts from beginning of camera/audio data where there are no loop waits.
-const int maxDataTransferWaitCount = 5000000;
+const int maxDataTransferWaitCount = 3000000;
 /// GENERAL Camera/audio WORKFLOW:
 /// 1. BLE Client writes value 0xFF,0xFF,0xFF,0xFF,0xFF,0x74/0x75,0x00,0x00 value to Camera / Audio Characteristic to trigger camera/microphone.
 /// 2. Board writes total count of image packets ceil(Image Length / 512) to Camera Characteristic in format 0xFF,0xEF,0xDF,0xCF,0xBF,<Count: 0 to 255>,0x00,0x00.
@@ -231,11 +231,13 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
   Serial.println("Resuming Advertising.");
 }
 void loop() {
-  // Read Air Monitor Vals every 300000 loops.
   if(!dataTransferProcess){
-    // Wait 2 minutes to save energy.
+    // Wait 5 minutes to save energy.
     ReadEnvironmentSensors();
-    delay(120000);
+    myCAM.set_bit(ARDUCHIP_GPIO,GPIO_PWDN_MASK);
+    delay(290000);
+    myCAM.clear_bit(ARDUCHIP_GPIO,GPIO_PWDN_MASK);
+    delay(10000);
   }else{
     if(loopCount > maxDataTransferWaitCount){
       // Stop the data transfer process.
