@@ -232,12 +232,12 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
 }
 void loop() {
   if(!dataTransferProcess){
-    // Wait 5 minutes to save energy.
+    // Wait 10 minutes to save energy.
     ReadEnvironmentSensors();
     myCAM.set_bit(ARDUCHIP_GPIO,GPIO_PWDN_MASK);
-    delay(290000);
+    delay(570000);
     myCAM.clear_bit(ARDUCHIP_GPIO,GPIO_PWDN_MASK);
-    delay(10000);
+    delay(30000);
   }else{
     if(loopCount > maxDataTransferWaitCount){
       // Stop the data transfer process.
@@ -316,7 +316,7 @@ void loop() {
         char writeBuffer[244];
         int  y = 0;
         for(int i = requestedPacketNum * 244; i < (requestedPacketNum * 244) + 244; i++){
-          Serial.print("0x");Serial.print(Data[i], HEX);Serial.println(",");
+          //Serial.print("0x");Serial.print(Data[i], HEX);Serial.println(",");
           writeBuffer[y] = Data[i];
           y++;
         }
@@ -336,7 +336,7 @@ void loop() {
         char writeBuffer[244];
         int  y = 0;
         for(int i = requestedPacketNum * 244; i < (requestedPacketNum * 244) + 244; i++){
-          Serial.print("0x");Serial.print(Data[i], HEX);Serial.println(",");
+          //Serial.print("0x");Serial.print(Data[i], HEX);Serial.println(",");
           writeBuffer[y] = Data[i];
           y++;
         }
