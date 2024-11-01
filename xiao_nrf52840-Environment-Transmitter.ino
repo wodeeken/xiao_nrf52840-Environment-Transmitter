@@ -234,8 +234,8 @@ void loop() {
   // Read Air Monitor Vals every 300000 loops.
   if(!dataTransferProcess){
     // Wait 2 minutes to save energy.
-    delay(120000);
     ReadEnvironmentSensors();
+    delay(120000);
   }else{
     if(loopCount > maxDataTransferWaitCount){
       // Stop the data transfer process.
