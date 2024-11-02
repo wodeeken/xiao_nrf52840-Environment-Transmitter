@@ -439,7 +439,7 @@ void ReadEnvironmentSensors(){
     }
     int temperature = ceil(bmp.temperature);
     int airPressure = ceil(bmp.pressure / 100);
-    Serial.print("Temp: ");
+    Serial.print("Enclosure Temp: ");
     Serial.println(bmp.temperature);
     Serial.print("Pressure: ");
     Serial.println(bmp.pressure);
@@ -449,10 +449,22 @@ void ReadEnvironmentSensors(){
     pressureCharacteristic.write(pressureReading, 2);
 
     // Read humidity reading.
-    float humidity_true = DHTSensor.readHumidity();
-    float humidity_temp_true = DHTSensor.readTemperature();
-    int humidity = ceil(humidity_true);
-    int humidity_temp = ceil(humidity_temp_true);
+    // If humidity and temperature is both zero, retry read. Reattempt up to 10 times.
+    int humidity;
+    int humidity_temp;
+    int humidityRetryCount = 0;
+    while(humidityRetryCount < 10){
+
+      humidity = ceil(DHTSensor.readHumidity());
+      humidity_temp = ceil(DHTSensor.readTemperature()); 
+      if(humidity == 0 && humidity_temp == 0){
+        humidityRetryCount++;
+        delay(100);
+      }else{
+        break;
+      }
+    }
+    
     char humidityReading[2] = {humidity >> 8, humidity & 0xFF};
     char tempHumidityReading[2] = {humidity_temp >> 8, humidity_temp & 0xFF};
     Serial.print("Humidity: ");
