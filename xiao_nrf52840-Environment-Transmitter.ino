@@ -15,7 +15,7 @@ const int DHT_AnalogPin = A0;
 bool is_header = false;
 int loopCount = 0;
 // Camera
-ArduCAM myCAM( OV2640, CS );
+ArduCAM myCAM(OV2640, CS);
 // Humidity Sensor.
 DHT DHTSensor(DHT_AnalogPin, DHT11);
 // Temp and Pressure Sensor.
@@ -23,20 +23,20 @@ Adafruit_BMP3XX bmp;
 // Microphone pin.
 int microphoneAnalogPin = A3;
 // Custom Camera Service and Characteristic.
-BLEService        cameraService = BLEService("e334b051-66f2-487f-8d55-9d2dda3a17cd");
+BLEService cameraService = BLEService("e334b051-66f2-487f-8d55-9d2dda3a17cd");
 BLECharacteristic cameraCharacteristic = BLECharacteristic("9a82b386-3169-475a-935a-2394cd7a4d1d");
 // Custom Air Monitor Service and Characteristics.
-BLEService        airMonitorService = BLEService("48ee2739-61c5-4594-b912-45a1646bef09");
+BLEService airMonitorService = BLEService("48ee2739-61c5-4594-b912-45a1646bef09");
 BLECharacteristic temperatureCharacteristic = BLECharacteristic("54eae144-c9b0-448e-9546-facb32a8bc75");
 BLECharacteristic pressureCharacteristic = BLECharacteristic("6d5c74ff-9853-4350-8970-456607fddcf8");
 BLECharacteristic humidityCharacteristic = BLECharacteristic("b2ecd36f-6730-45a8-a5fe-351191642c24");
 BLECharacteristic humidity_TempCharacteristic = BLECharacteristic("eec2eb81-ebb1-4352-8420-047304011fdb");
 
 // Custom Audio Service and Characteristics.
-BLEService        audioService = BLEService("8cdcb857-715e-4a72-aa99-8ed0c6b46d2a");
+BLEService audioService = BLEService("8cdcb857-715e-4a72-aa99-8ed0c6b46d2a");
 BLECharacteristic audioCharacteristic = BLECharacteristic("e9a68cde-2ac4-4cf4-b920-bf03786aee62");
 BLECharacteristic audioSampleRateCharacteristic = BLECharacteristic("0e70dcba-ced1-47bb-a269-af30eb979f12");
-BLEDis bledis;    // DIS (Device Information Service) helper class instance
+BLEDis bledis;  // DIS (Device Information Service) helper class instance
 
 // Store image and audio data here.
 char Data[200000];
@@ -53,7 +53,7 @@ const int maxDataTransferWaitCount = 3000000;
 /// Other data is periodically sampled and written to the relevant characteristic.
 void setup() {
   // put your setup code here, to run once:
-  
+
   Serial.begin(9600);
   // Setup ArduCAM
   Serial.println("Now setting up ArduCAM");
@@ -62,52 +62,65 @@ void setup() {
   Wire.begin();
 
   SPI.begin();
-  
+
   pinMode(CS, OUTPUT);
 
   delay(1000);
   digitalWrite(CS, LOW);
   SPI.begin();
-  
+
   //Reset the CPLD
   myCAM.write_reg(0x07, 0x80);
   delay(100);
   myCAM.write_reg(0x07, 0x00);
-  while(1){
+  // loop only a finite amount, then restart board.
+  int initializationRestartLoopCount = 0;
+  while (1) {
     //Check if the ArduCAM SPI bus is OK
     myCAM.write_reg(ARDUCHIP_TEST1, 0x55);
     temp = myCAM.read_reg(ARDUCHIP_TEST1);
-    if (temp != 0x55){
+    if (temp != 0x55) {
       Serial.println(temp);
       Serial.println(F("ACK CMD SPI interface Error! END"));
+      if (initializationRestartLoopCount > 30) {
+        Serial.println("Rebooting board.");
+        delay(1000);
+        reboot();
+      }
+      initializationRestartLoopCount++;
       delay(1000);
       continue;
-    }else{
+    } else {
       Serial.println(temp);
       Serial.println(F("ACK CMD SPI interface OK. END"));
       break;
     }
   }
- 
-  while(1){
+  initializationRestartLoopCount = 0;
+  while (1) {
     Serial.println("Loop!");
     delay(2000);
     //Check if the camera module type is OV2640
     myCAM.wrSensorReg8_8(0xff, 0x01);
-    
+
     myCAM.rdSensorReg8_8(OV2640_CHIPID_HIGH, &vid);
-   
+
     myCAM.rdSensorReg8_8(OV2640_CHIPID_LOW, &pid);
-    
-    if ((vid != 0x26 ) && (( pid != 0x41 ) || ( pid != 0x42 ))){
+
+    if ((vid != 0x26) && ((pid != 0x41) || (pid != 0x42))) {
       Serial.println(F("ACK CMD Can't find OV2640 module! END"));
+      if (initializationRestartLoopCount > 30) {
+        Serial.println("Rebooting board.");
+        delay(1000);
+        reboot();
+      }
+      initializationRestartLoopCount++;
       delay(1000);
       continue;
-    }
-    else{
+    } else {
       Serial.println(F("ACK CMD OV2640 detected. END"));
       break;
-    } 
+    }
   }
   myCAM.set_format(JPEG);
   myCAM.InitCAM();
@@ -117,15 +130,23 @@ void setup() {
   Serial.println("ArduCAM setup complete.");
 
   Serial.println("Now setting up Air Pressure/Temperature monitor.");
-  while (!bmp.begin_I2C()) { 
+  initializationRestartLoopCount = 0;
+  while (!bmp.begin_I2C()) {
     Serial.println("Could not find BMP.");
+    if (initializationRestartLoopCount > 30) {
+      Serial.println("Rebooting board.");
+      delay(1000);
+      reboot();
+    }
+    initializationRestartLoopCount++;
+    delay(1000);
   }
   bmp.setTemperatureOversampling(BMP3_OVERSAMPLING_8X);
   bmp.setPressureOversampling(BMP3_OVERSAMPLING_4X);
   bmp.setIIRFilterCoeff(BMP3_IIR_FILTER_COEFF_3);
   bmp.setOutputDataRate(BMP3_ODR_50_HZ);
   Serial.println("Air Pressure/Temperature monitor setup complete.");
-  
+
   Serial.println("Now setting up Humidity monitor.");
   DHTSensor.begin();
   Serial.println("Humidity monitor setup complete.");
@@ -143,14 +164,14 @@ void setup() {
   // Set the connect/disconnect callback handlers
   Bluefruit.Periph.setConnectCallback(connect_callback);
   Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
-  
+
   // Configure and Start the Device Information Service
   Serial.println("Now configuring the Device Information Service");
   bledis.setManufacturer("MyManufacturer");
   bledis.setModel("MyBoard");
   bledis.begin();
   Serial.println("Device Information Service setup is complete.");
-  
+
   Serial.println("Now configuring the custom Camera Service and Characteristic.");
   cameraService.begin();
   cameraCharacteristic.setProperties(CHR_PROPS_WRITE | CHR_PROPS_READ);
@@ -195,164 +216,132 @@ void setup() {
   // Include Camera Service.
   Bluefruit.Advertising.addService(cameraService);
   Bluefruit.Advertising.addName();
-  
+
   Bluefruit.Advertising.restartOnDisconnect(true);
-  Bluefruit.Advertising.setInterval(32, 244); 
-  Bluefruit.Advertising.setFastTimeout(30);      
-  Bluefruit.Advertising.start(0);             
+  Bluefruit.Advertising.setInterval(32, 244);
+  Bluefruit.Advertising.setFastTimeout(30);
+  Bluefruit.Advertising.start(0);
 
   Serial.println("Advertising setup is complete.");
   Serial.println("Setup and configuration is complete.");
 }
-void connect_callback(uint16_t conn_handle)
-{
+void connect_callback(uint16_t conn_handle) {
   BLEConnection* connection = Bluefruit.Connection(conn_handle);
   // Increase the bandwidth.
   connection->requestPHY();
   connection->requestDataLengthUpdate();
-  connection->requestMtuExchange(247); 
+  connection->requestMtuExchange(247);
   Serial.println("All requests send. Now waiting 30 secs.");
   delay(3000);
-  
+
   char central_name[32] = { 0 };
   connection->getPeerName(central_name, sizeof(central_name));
-  
+
   Serial.print("Connected to ");
   Serial.println(central_name);
 }
 
 
-void disconnect_callback(uint16_t conn_handle, uint8_t reason)
-{
-  (void) conn_handle;
-  (void) reason;
+void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
+  (void)conn_handle;
+  (void)reason;
 
-  Serial.print("Disconnected, reason = 0x"); Serial.println(reason, HEX);
+  Serial.print("Disconnected, reason = 0x");
+  Serial.println(reason, HEX);
   Serial.println("Resuming Advertising.");
 }
 void loop() {
-  if(!dataTransferProcess){
+  if (!dataTransferProcess) {
     // Wait 10 minutes to save energy.
     ReadEnvironmentSensors();
-    myCAM.set_bit(ARDUCHIP_GPIO,GPIO_PWDN_MASK);
+    myCAM.set_bit(ARDUCHIP_GPIO, GPIO_PWDN_MASK);
     delay(570000);
-    myCAM.clear_bit(ARDUCHIP_GPIO,GPIO_PWDN_MASK);
+    myCAM.clear_bit(ARDUCHIP_GPIO, GPIO_PWDN_MASK);
     delay(30000);
-  }else{
-    if(loopCount > maxDataTransferWaitCount){
+  } else {
+    if (loopCount > maxDataTransferWaitCount) {
       // Stop the data transfer process.
       dataTransferProcess = false;
     }
   }
-  if ( Bluefruit.connected() ) {
-      char buffer[20];
-      // Are values == camera trigger sequence? (0xFF,0xFF,0xFF,0xFF,0xFF,0x74,0x00,0x00)
-      if (cameraCharacteristic.read(&buffer, 8) && 
-          buffer[0] == 0xFF && 
-          buffer[1] == 0xFF &&
-          buffer[2] == 0xFF &&
-          buffer[3] == 0xFF &&
-          buffer[4] == 0xFF &&
-          buffer[5] == 0x74 && 
-          buffer[6] == 0x00 &&
-          buffer[7] == 0x00 ){
+  if (Bluefruit.connected()) {
+    char buffer[20];
+    // Are values == camera trigger sequence? (0xFF,0xFF,0xFF,0xFF,0xFF,0x74,0x00,0x00)
+    if (cameraCharacteristic.read(&buffer, 8) && buffer[0] == 0xFF && buffer[1] == 0xFF && buffer[2] == 0xFF && buffer[3] == 0xFF && buffer[4] == 0xFF && buffer[5] == 0x74 && buffer[6] == 0x00 && buffer[7] == 0x00) {
       // Clear out whole cameradata array.
-      for(int i = 0; i < 200000; i++)
+      for (int i = 0; i < 200000; i++)
         Data[i] = 0;
-      
+
       dataTransferProcess = true;
       loopCount = 0;
       Serial.println("Triggering camera.");
-       // Trigger camera
-        myCAM.flush_fifo();
+      // Trigger camera
+      myCAM.flush_fifo();
+      myCAM.clear_fifo_flag();
+      //Start capture
+      delay(250);
+      myCAM.start_capture();
+      delay(250);
+      if (myCAM.get_bit(ARDUCHIP_TRIG, CAP_DONE_MASK)) {
+        delay(50);
+        read_fifo_burst(myCAM);
+        //Clear the capture done flag
         myCAM.clear_fifo_flag();
-        //Start capture
-        delay(250);
-        myCAM.start_capture();
-        delay(250);
-        if (myCAM.get_bit(ARDUCHIP_TRIG, CAP_DONE_MASK))
-        {
-          delay(50);
-          read_fifo_burst(myCAM);
-          //Clear the capture done flag
-          myCAM.clear_fifo_flag();
-        }
-        // Write image length.
-        Serial.println("Image length: ");
-        Serial.println(imageLength);
-        Serial.println("Packet Count: ");
-        short totalPacketCount = ceil((float)imageLength/244);
-        Serial.println(totalPacketCount);
-        char packetCount[2] = { totalPacketCount >> 8, totalPacketCount & 0xFF};
-        Serial.print("Upper byte:");Serial.println(packetCount[0], HEX);
-        Serial.print("Low byte:");Serial.println(packetCount[1], HEX);
-        cameraCharacteristic.write(packetCount, 2);
-  // Are values == audio trigger sequence? (0xFF,0xFF,0xFF,0xFF,0xFF,0x75,0x00,0x00)
-  }else if(audioCharacteristic.read(&buffer, 8) && 
-          buffer[0] == 0xFF && 
-          buffer[1] == 0xFF &&
-          buffer[2] == 0xFF &&
-          buffer[3] == 0xFF &&
-          buffer[4] == 0xFF &&
-          buffer[5] == 0x75 && 
-          buffer[6] == 0x00 &&
-          buffer[7] == 0x00 ){
-        
-        dataTransferProcess = true;
-        loopCount = 0;
-        RecordAudio();
-  // Are values == camera packet count? (0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00)
-  }else if(cameraCharacteristic.read(&buffer, 9) && 
-          buffer[0] == 0xFF && 
-          buffer[1] == 0xEF &&
-          buffer[2] == 0xDF &&
-          buffer[3] == 0xCF &&
-          buffer[4] == 0xBF &&
-          buffer[7] == 0x00 &&
-          buffer[8] == 0x00){
-        int requestedPacketNum = (buffer[5] << 8) | buffer[6];
-        Serial.print("Write packet #");
-        Serial.println(requestedPacketNum, DEC);
-        char writeBuffer[244];
-        int  y = 0;
-        for(int i = requestedPacketNum * 244; i < (requestedPacketNum * 244) + 244; i++){
-          //Serial.print("0x");Serial.print(Data[i], HEX);Serial.println(",");
-          writeBuffer[y] = Data[i];
-          y++;
-        }
-        cameraCharacteristic.write(writeBuffer, 244);
-  // Are values == camera packet count? (0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00)
-  }else if(audioCharacteristic.read(&buffer, 9) && 
-          buffer[0] == 0xFF && 
-          buffer[1] == 0xEF &&
-          buffer[2] == 0xDF &&
-          buffer[3] == 0xCF &&
-          buffer[4] == 0xBF &&
-          buffer[7] == 0x00 &&
-          buffer[8] == 0x00){
-        int requestedPacketNum = (buffer[5] << 8) | buffer[6];
-        Serial.print("Write packet #");
-        Serial.println(requestedPacketNum, DEC);
-        char writeBuffer[244];
-        int  y = 0;
-        for(int i = requestedPacketNum * 244; i < (requestedPacketNum * 244) + 244; i++){
-          //Serial.print("0x");Serial.print(Data[i], HEX);Serial.println(",");
-          writeBuffer[y] = Data[i];
-          y++;
-        }
-        audioCharacteristic.write(writeBuffer, 244);
-  
-  }
-  }
-  
-  loopCount++;
+      }
+      // Write image length.
+      Serial.println("Image length: ");
+      Serial.println(imageLength);
+      Serial.println("Packet Count: ");
+      short totalPacketCount = ceil((float)imageLength / 244);
+      Serial.println(totalPacketCount);
+      char packetCount[2] = { totalPacketCount >> 8, totalPacketCount & 0xFF };
+      Serial.print("Upper byte:");
+      Serial.println(packetCount[0], HEX);
+      Serial.print("Low byte:");
+      Serial.println(packetCount[1], HEX);
+      cameraCharacteristic.write(packetCount, 2);
+      // Are values == audio trigger sequence? (0xFF,0xFF,0xFF,0xFF,0xFF,0x75,0x00,0x00)
+    } else if (audioCharacteristic.read(&buffer, 8) && buffer[0] == 0xFF && buffer[1] == 0xFF && buffer[2] == 0xFF && buffer[3] == 0xFF && buffer[4] == 0xFF && buffer[5] == 0x75 && buffer[6] == 0x00 && buffer[7] == 0x00) {
 
+      dataTransferProcess = true;
+      loopCount = 0;
+      RecordAudio();
+      // Are values == camera packet count? (0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00)
+    } else if (cameraCharacteristic.read(&buffer, 9) && buffer[0] == 0xFF && buffer[1] == 0xEF && buffer[2] == 0xDF && buffer[3] == 0xCF && buffer[4] == 0xBF && buffer[7] == 0x00 && buffer[8] == 0x00) {
+      int requestedPacketNum = (buffer[5] << 8) | buffer[6];
+      Serial.print("Write packet #");
+      Serial.println(requestedPacketNum, DEC);
+      char writeBuffer[244];
+      int y = 0;
+      for (int i = requestedPacketNum * 244; i < (requestedPacketNum * 244) + 244; i++) {
+        //Serial.print("0x");Serial.print(Data[i], HEX);Serial.println(",");
+        writeBuffer[y] = Data[i];
+        y++;
+      }
+      cameraCharacteristic.write(writeBuffer, 244);
+      // Are values == camera packet count? (0xFF,0xEF,0xDF,0xCF,0xBF,<CountHighByte>,<CountLowByte>,0x00,0x00)
+    } else if (audioCharacteristic.read(&buffer, 9) && buffer[0] == 0xFF && buffer[1] == 0xEF && buffer[2] == 0xDF && buffer[3] == 0xCF && buffer[4] == 0xBF && buffer[7] == 0x00 && buffer[8] == 0x00) {
+      int requestedPacketNum = (buffer[5] << 8) | buffer[6];
+      Serial.print("Write packet #");
+      Serial.println(requestedPacketNum, DEC);
+      char writeBuffer[244];
+      int y = 0;
+      for (int i = requestedPacketNum * 244; i < (requestedPacketNum * 244) + 244; i++) {
+        //Serial.print("0x");Serial.print(Data[i], HEX);Serial.println(",");
+        writeBuffer[y] = Data[i];
+        y++;
+      }
+      audioCharacteristic.write(writeBuffer, 244);
+    }
+  }
+
+  loopCount++;
 }
-void RecordAudio(){
+void RecordAudio() {
   int currentAudioIndex = 0;
   int beginTime = micros();
   Serial.println("Begin audio record.");
-  while(currentAudioIndex < 200000){
+  while (currentAudioIndex < 200000) {
 
     int16_t sample = analogRead(microphoneAnalogPin);
     sample = sample << 6;
@@ -363,12 +352,15 @@ void RecordAudio(){
   }
   int endTime = micros();
   Serial.println("Audio record done.");
-  Serial.print("Length of sample in micros: ");Serial.println(beginTime - endTime);
-  Serial.print("In Seconds: ");Serial.println(((float)(endTime - beginTime)) / 1000000);
+  Serial.print("Length of sample in micros: ");
+  Serial.println(beginTime - endTime);
+  Serial.print("In Seconds: ");
+  Serial.println(((float)(endTime - beginTime)) / 1000000);
   int sampleRate = 100000 / (((float)(endTime - beginTime)) / 1000000);
-  Serial.print("Audio Sample Rate: ");Serial.print(sampleRate);
+  Serial.print("Audio Sample Rate: ");
+  Serial.print(sampleRate);
   // Packet count = (Data Array size = 200000) / (Characteristic size = 244 bytes) = 820
-  char packetCount[2] = { 820 >> 8, 820 & 0xFF};
+  char packetCount[2] = { 820 >> 8, 820 & 0xFF };
   audioCharacteristic.write(packetCount, 2);
   // write sample rate.
   packetCount[0] = sampleRate >> 8;
@@ -376,42 +368,37 @@ void RecordAudio(){
   audioSampleRateCharacteristic.write(packetCount, 2);
 }
 
-uint8_t read_fifo_burst(ArduCAM myCAM)
-{
+uint8_t read_fifo_burst(ArduCAM myCAM) {
   uint8_t temp = 0, temp_last = 0;
   uint32_t length = 0;
   length = myCAM.read_fifo_length();
-  if (length >= MAX_FIFO_SIZE) //512 kb
+  if (length >= MAX_FIFO_SIZE)  //512 kb
   {
     Serial.println(F("ACK CMD Over size. END"));
     return 0;
   }
-  if (length == 0 ) //0 kb
+  if (length == 0)  //0 kb
   {
     Serial.println(F("ACK CMD Size is 0. END"));
     return 0;
   }
   myCAM.CS_LOW();
-  myCAM.set_fifo_burst();//Set fifo burst mode
-  temp =  SPI.transfer(0x00);
-  length --;
+  myCAM.set_fifo_burst();  //Set fifo burst mode
+  temp = SPI.transfer(0x00);
+  length--;
   int index = 0;
-  while ( length-- )
-  {
+  while (length--) {
     temp_last = temp;
-    temp =  SPI.transfer(0x00);
-    if (is_header == true)
-    {
+    temp = SPI.transfer(0x00);
+    if (is_header == true) {
       //Serial.print("0x");
       //Serial.print(temp, HEX);
       //Serial.write(",");
       Data[index] = temp;
       index++;
-    }
-    else if ((temp == 0xD8) & (temp_last == 0xFF))
-    {
+    } else if ((temp == 0xD8) & (temp_last == 0xFF)) {
       is_header = true;
-      Data[index]  = temp_last;
+      Data[index] = temp_last;
       index++;
       Data[index] = temp;
       index++;
@@ -422,8 +409,8 @@ uint8_t read_fifo_burst(ArduCAM myCAM)
       // Serial.print(temp, HEX);
       // Serial.print(",");
     }
-    if ( (temp == 0xD9) && (temp_last == 0xFF) ) //If find the end ,break while,
-    break;
+    if ((temp == 0xD9) && (temp_last == 0xFF))  //If find the end ,break while,
+      break;
     delayMicroseconds(15);
   }
   myCAM.CS_HIGH();
@@ -431,47 +418,49 @@ uint8_t read_fifo_burst(ArduCAM myCAM)
   imageLength = index;
   return 1;
 }
-void ReadEnvironmentSensors(){
-    Serial.println("Time to read air monitor.");
-    // Perform Air Monitor Readings.
-    if(!bmp.performReading()){
-      Serial.println("Failed to perform temperature and air pressure reading.");
-    }
-    int temperature = ceil(bmp.temperature);
-    int airPressure = ceil(bmp.pressure / 100);
-    Serial.print("Enclosure Temp: ");
-    Serial.println(bmp.temperature);
-    Serial.print("Pressure: ");
-    Serial.println(bmp.pressure);
-    char tempReading[2] = {temperature >> 8, temperature & 0xFF};
-    char pressureReading[2] = {airPressure >> 8, airPressure & 0xFF};
-    temperatureCharacteristic.write(tempReading, 2);
-    pressureCharacteristic.write(pressureReading, 2);
-
-    // Read humidity reading.
-    // If humidity and temperature is both zero, retry read. Reattempt up to 10 times.
-    int humidity;
-    int humidity_temp;
-    int humidityRetryCount = 0;
-    while(humidityRetryCount < 10){
-
-      humidity = ceil(DHTSensor.readHumidity());
-      humidity_temp = ceil(DHTSensor.readTemperature()); 
-      if(humidity == 0 && humidity_temp == 0){
-        humidityRetryCount++;
-        delay(100);
-      }else{
-        break;
-      }
-    }
-    
-    char humidityReading[2] = {humidity >> 8, humidity & 0xFF};
-    char tempHumidityReading[2] = {humidity_temp >> 8, humidity_temp & 0xFF};
-    Serial.print("Humidity: ");
-    Serial.println(humidity);
-    Serial.print("Temp used for Humidity calc: ");
-    Serial.println(humidity_temp);
-    humidityCharacteristic.write(humidityReading, 2);
-    humidity_TempCharacteristic.write(tempHumidityReading, 2);
-
+void ReadEnvironmentSensors() {
+  Serial.println("Time to read air monitor.");
+  // Perform Air Monitor Readings.
+  if (!bmp.performReading()) {
+    Serial.println("Failed to perform temperature and air pressure reading.");
   }
+  int temperature = ceil(bmp.temperature);
+  int airPressure = ceil(bmp.pressure / 100);
+  Serial.print("Enclosure Temp: ");
+  Serial.println(bmp.temperature);
+  Serial.print("Pressure: ");
+  Serial.println(bmp.pressure);
+  char tempReading[2] = { temperature >> 8, temperature & 0xFF };
+  char pressureReading[2] = { airPressure >> 8, airPressure & 0xFF };
+  temperatureCharacteristic.write(tempReading, 2);
+  pressureCharacteristic.write(pressureReading, 2);
+
+  // Read humidity reading.
+  // If humidity and temperature is both zero, retry read. Reattempt up to 10 times.
+  int humidity;
+  int humidity_temp;
+  int humidityRetryCount = 0;
+  while (humidityRetryCount < 10) {
+
+    humidity = ceil(DHTSensor.readHumidity());
+    humidity_temp = ceil(DHTSensor.readTemperature());
+    if (humidity == 0 && humidity_temp == 0) {
+      humidityRetryCount++;
+      delay(100);
+    } else {
+      break;
+    }
+  }
+
+  char humidityReading[2] = { humidity >> 8, humidity & 0xFF };
+  char tempHumidityReading[2] = { humidity_temp >> 8, humidity_temp & 0xFF };
+  Serial.print("Humidity: ");
+  Serial.println(humidity);
+  Serial.print("Temp used for Humidity calc: ");
+  Serial.println(humidity_temp);
+  humidityCharacteristic.write(humidityReading, 2);
+  humidity_TempCharacteristic.write(tempHumidityReading, 2);
+}
+void reboot() {
+  NVIC_SystemReset();
+}
