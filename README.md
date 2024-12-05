@@ -64,10 +64,10 @@ Arduino sketch for the Seeed Xiao nRF52840 board, a Adafruit BMP-390 Temp/Pressu
 |                     |                                      | Microphone Trigger/Data         | e9a68cde-2ac4-4cf4-b920-bf03786aee62 | Read/Write  | 244                     |
 |                     |                                      | Audio Sample Rate (Hz)          | 0e70dcba-ced1-47bb-a269-af30eb979f12 | Read        | 2                       |
 | Air Monitor         | 48ee2739-61c5-4594-b912-45a1646bef09 |                                 |                                      |             |                         |
-|                     |                                      | Enclosure Temperature (Celsius) | 54eae144-c9b0-448e-9546-facb32a8bc75 | Read        | 2                       |
+|                     |                                      | Enclosure Temperature (Celsius) | 54eae144-c9b0-448e-9546-facb32a8bc75 | Read        | 4                       |
 |                     |                                      | Air Pressure (hPa)              | 6d5c74ff-9853-4350-8970-456607fddcf8 | Read        | 2                       |
 |                     |                                      | Relative Humidity (%)           | b2ecd36f-6730-45a8-a5fe-351191642c24 | Read        | 2                       |
-|                     |                                      | Outer Temperature (Celsius)     | eec2eb81-ebb1-4352-8420-047304011fdb | Read        | 2                       |
+|                     |                                      | Outer Temperature (Celsius)     | eec2eb81-ebb1-4352-8420-047304011fdb | Read        | 4                       |
 
 2. The Air Monitor values are refreshed every few minutes.
 
