@@ -430,9 +430,11 @@ void ReadEnvironmentSensors() {
   Serial.println(bmp.temperature);
   Serial.print("Pressure: ");
   Serial.println(bmp.pressure);
-  char tempReading[2] = { temperature >> 8, temperature & 0xFF };
+  char tempReading[4] = {temperature >> 24, temperature >> 16 ,temperature >> 8, temperature & 0xFF };
+  Serial.println(tempReading[0], HEX);
+  Serial.println(tempReading[1], HEX);
   char pressureReading[2] = { airPressure >> 8, airPressure & 0xFF };
-  temperatureCharacteristic.write(tempReading, 2);
+  temperatureCharacteristic.write(tempReading, 4);
   pressureCharacteristic.write(pressureReading, 2);
 
   // Read humidity reading.
@@ -453,13 +455,13 @@ void ReadEnvironmentSensors() {
   }
 
   char humidityReading[2] = { humidity >> 8, humidity & 0xFF };
-  char tempHumidityReading[2] = { humidity_temp >> 8, humidity_temp & 0xFF };
+  char tempHumidityReading[4] = { humidity_temp >> 24,humidity_temp >> 16,humidity_temp >> 8, humidity_temp & 0xFF };
   Serial.print("Humidity: ");
   Serial.println(humidity);
   Serial.print("Temp used for Humidity calc: ");
   Serial.println(humidity_temp);
   humidityCharacteristic.write(humidityReading, 2);
-  humidity_TempCharacteristic.write(tempHumidityReading, 2);
+  humidity_TempCharacteristic.write(tempHumidityReading, 4);
 }
 void reboot() {
   NVIC_SystemReset();
